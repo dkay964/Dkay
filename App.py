@@ -1,4 +1,5 @@
-cd path/to/your/project-folder
-git add .
-git commit -m "Add app.py"
-git push origin main
+import streamlit as st
+
+st.title("Forex Scanner v1")
+
+st.write("Welcome to your real-time Forex trading scanner!")
