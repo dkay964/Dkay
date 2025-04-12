@@ -1,0 +1,65 @@
+import streamlit as st
+import pandas as pd
+import datetime as dt
+import yfinance as yf
+from ta.trend import EMAIndicator, MACD
+from ta.momentum import RSIIndicator
+
+# ----------------------- Settings ----------------------------
+st.set_page_config(page_title="Forex Scanner", layout="wide")
+
+# Symbols list (can be expanded)
+symbols = ['EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'AUDUSD=X']
+timeframe = '1h'
+
+# Risk Management Settings
+RISK_PER_TRADE = 0.02
+ACCOUNT_BALANCE = 10  # For $10 account
+
+# -------------------- Helper Functions -----------------------
+def download_data(symbol, period='7d', interval='1h'):
+    return yf.download(symbol, period=period, interval=interval)
+
+def apply_indicators(df):
+    df['EMA20'] = EMAIndicator(df['Close'], window=20).ema_indicator()
+    df['EMA50'] = EMAIndicator(df['Close'], window=50).ema_indicator()
+    df['RSI'] = RSIIndicator(df['Close'], window=14).rsi()
+    macd = MACD(df['Close'])
+    df['MACD'] = macd.macd()
+    df['MACD_signal'] = macd.macd_signal()
+    return df
+
+def generate_signals(df):
+    latest = df.iloc[-1]
+    entry = exit = stop_loss = None
+    if (
+        latest['EMA20'] > latest['EMA50'] and
+        latest['RSI'] > 50 and
+        latest['MACD'] > latest['MACD_signal']
+    ):
+        entry = latest['Close']
+        stop_loss = entry - 0.01  # Example 10 pip SL
+        exit = entry + 0.02       # Example 20 pip TP
+    return entry, exit, stop_loss
+
+# ------------------------ UI Layout -------------------------
+st.title("Real-Time Forex Trade Scanner for Small Accounts")
+st.markdown("**Account Balance:** $10 | Risk per Trade: 2%")
+
+cols = st.columns(len(symbols))
+for i, symbol in enumerate(symbols):
+    with cols[i]:
+        st.subheader(symbol.replace('=X', ''))
+        df = download_data(symbol)
+        df = apply_indicators(df)
+        entry, exit, stop_loss = generate_signals(df)
+
+        if entry:
+            st.success(f"**BUY Signal**")
+            st.write(f"**Entry:** {entry:.5f}")
+            st.write(f"**Exit (TP):** {exit:.5f}")
+            st.write(f"**Stop Loss:** {stop_loss:.5f}")
+        else:
+            st.info("No valid long trade signal right now.")
+
+        st.line_chart(df[['Close', 'EMA20', 'EMA50']].dropna())
